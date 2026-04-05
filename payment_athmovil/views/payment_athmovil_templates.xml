@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Part of payment_athmovil. See LICENSE file for full copyright and licensing details. -->
+<!--
+    ATH Móvil® is a registered trademark of EVERTEC Group, LLC.
+    This module is an independent integration and is not affiliated with
+    or endorsed by EVERTEC.
+-->
+<odoo>
+
+    <!-- QWeb template for the ATH Móvil payment redirect form.
+         Odoo's payment framework renders this template inside its own layout
+         when the customer selects ATH Móvil as their payment method.
+         The template ID must match what _get_redirect_form_view() returns.
+
+         Data passed from _get_specific_processing_values():
+           - public_token    : merchant's ATH Business public token
+           - amount          : transaction total (float)
+           - subtotal        : transaction subtotal (float)
+           - tax             : tax amount (float)
+           - metadata1       : Odoo transaction reference
+           - metadata2       : company name
+           - items           : list of order line dicts
+           - ecommerce_id    : ATH Móvil ecommerceId (set after ticket creation)
+    -->
+    <template id="redirect_form" name="ATH Móvil Payment Form">
+
+        <!-- Load the ATH Móvil modal JS from their CDN.
+             This script provides the global ATHM_Checkout object.
+             Note: ATH Móvil does not currently provide SRI hashes for this
+             script. Add integrity= attribute when ATH Móvil publishes one
+             (SECURITY-13 compliance). -->
+        <script type="text/javascript"
+                src="https://payments.athmovil.com/api/modal/js/athmovil_base.js">
+        </script>
+
+        <div class="o_payment_athmovil_form">
+
+            <!-- ============================================================
+                 LEGAL NOTICE FOR END CUSTOMER (RF-10, Gap 3)
+                 Visible to the customer BEFORE the payment button.
+                 Required by legal constraints — must appear on the payment form.
+                 ============================================================ -->
+            <div class="alert alert-info o_athmovil_legal_notice" role="alert">
+                <p>
+                    By paying with ATH Móvil you agree to
+                    <a href="https://ath.business/terminos" target="_blank">
+                        ATH Business Terms
+                    </a>.
+                    You must have an active ATH Móvil account and the
+                    <strong>ATH Móvil app</strong> installed on your phone
+                    to complete this payment.
+                </p>
+                <p>
+                    <strong>Download the app:</strong>
+                    <a href="https://apps.apple.com/app/ath-movil/id658539297"
+                       target="_blank">App Store</a>
+                    |
+                    <a href="https://play.google.com/store/apps/details?id=com.evertec.athmovil.android"
+                       target="_blank">Google Play</a>
+                </p>
+            </div>
+
+            <!-- ============================================================
+                 PAYMENT BUTTON
+                 The actual ATHM_Checkout initialization happens in
+                 athmovil_checkout.js after the pre-checkout banner is shown.
+                 ============================================================ -->
+            <div class="o_athmovil_payment_container text-center mt-3">
+                <button id="ATHMovil_Checkout_Button"
+                        class="btn btn-primary btn-lg o_athmovil_pay_btn"
+                        data-testid="athmovil-pay-button">
+                    Pay with ATH Móvil
+                </button>
+            </div>
+
+            <!-- ============================================================
+                 DATA CONTAINER
+                 Passes server-side values to athmovil_checkout.js via
+                 data- attributes. Avoids inline JS and keeps the template
+                 clean and testable.
+                 ============================================================ -->
+            <div id="o_athmovil_data"
+                 class="d-none"
+                 data-testid="athmovil-data-container"
+                 t-att-data-public-token="public_token"
+                 t-att-data-amount="amount"
+                 t-att-data-subtotal="subtotal"
+                 t-att-data-tax="tax"
+                 t-att-data-metadata1="metadata1"
+                 t-att-data-metadata2="metadata2"
+                 t-att-data-ecommerce-id="ecommerce_id"
+                 t-att-data-items="items"
+                 data-return-url="/payment/athmovil/return"
+                 data-check-status-url="/payment/athmovil/check_status"
+                 data-status-url="/payment/status">
+            </div>
+
+            <!-- Loading spinner shown while the modal initializes -->
+            <div id="o_athmovil_loading"
+                 class="text-center mt-3 d-none"
+                 data-testid="athmovil-loading-spinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Opening ATH Móvil payment...</p>
+            </div>
+
+        </div>
+
+        <!-- Load our checkout JS module after the ATH Móvil CDN script.
+             Registered as an ES module — compatible with Odoo 17/18/19 asset system. -->
+        <script type="module"
+                src="/payment_athmovil/static/src/js/athmovil_checkout.js">
+        </script>
+
+    </template>
+
+</odoo>

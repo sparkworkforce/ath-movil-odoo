@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Part of payment_athmovil. See LICENSE file for full copyright and licensing details. -->
+<!--
+    ATH Móvil® is a registered trademark of EVERTEC Group, LLC.
+    This module is an independent integration and is not affiliated with
+    or endorsed by EVERTEC.
+-->
+<odoo>
+
+    <!-- Inherit the payment.provider form view to add ATH Móvil-specific fields.
+         Fields are shown/hidden using the modern Odoo 17+ invisible= syntax
+         (compatible with Odoo 17, 18, and 19 — avoids deprecated attrs= syntax). -->
+    <record id="payment_provider_form_athmovil" model="ir.ui.view">
+        <field name="name">payment.provider.form.athmovil</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Insert ATH Móvil credential fields after the provider-specific
+                 configuration section. The group is only visible when the
+                 selected provider is ATH Móvil. -->
+            <xpath expr="//field[@name='code']" position="after">
+
+                <!-- Legal notice banner — visible only for ATH Móvil provider.
+                     Informs the admin that they must accept ATH Business T&C
+                     before activating this provider. -->
+                <div class="alert alert-warning"
+                     role="alert"
+                     invisible="code != 'athmovil'">
+                    <strong>Aviso Legal / Legal Notice:</strong>
+                    Debes aceptar los Términos y Condiciones de ATH Business antes
+                    de usar este proveedor de pago.
+                    <a href="https://ath.business/terminos" target="_blank">
+                        https://ath.business/terminos
+                    </a>
+                    <br/>
+                    You must accept ATH Business Terms and Conditions before
+                    activating this payment provider.
+                </div>
+
+                <!-- ATH Móvil credential fields group -->
+                <group string="ATH Móvil Credentials"
+                       invisible="code != 'athmovil'">
+
+                    <!-- Public Token: identifies the merchant's ATH Business account.
+                         required= enforces UI-side validation; @api.constrains in the
+                         model enforces server-side validation. -->
+                    <field name="athmovil_public_token"
+                           required="code == 'athmovil'"
+                           invisible="code != 'athmovil'"
+                           help="Your ATH Business Public Token. Found in ATH Business app under Settings > Development. Use 'dummy' for sandbox testing."/>
+
+                    <!-- Private Token: authenticates API requests.
+                         password=True masks the value in the UI.
+                         groups= on the model field restricts ORM-level access. -->
+                    <field name="athmovil_private_token"
+                           required="code == 'athmovil'"
+                           invisible="code != 'athmovil'"
+                           password="True"
+                           help="Your ATH Business Private Token. Found in ATH Business app under Settings > Development. Keep this secret — never share it."/>
+
+                </group>
+
+                <!-- Sandbox testing instructions — visible only for ATH Móvil -->
+                <div class="alert alert-info"
+                     role="alert"
+                     invisible="code != 'athmovil'">
+                    <strong>Testing / Pruebas:</strong>
+                    Set Public Token to <code>dummy</code> to enable sandbox mode.
+                    You will need a separate ATH Móvil Personal account on a
+                    different phone (cannot be the same card as your ATH Business account).
+                    <br/>
+                    Establece el Public Token como <code>dummy</code> para el modo sandbox.
+                    Necesitas una cuenta ATH Móvil Personal separada en otro teléfono.
+                </div>
+
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

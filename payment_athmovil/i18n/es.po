@@ -1,0 +1,150 @@
+# Spanish translation for payment_athmovil
+# Copyright (C) 2026 Spark Workforce LLC
+# This file is distributed under the same license as the payment_athmovil package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 17.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-05 00:00+0000\n"
+"PO-Revision-Date: 2026-04-05 00:00+0000\n"
+"Last-Translator: Spark Workforce LLC <jvelez@sparkworkforcellc.com>\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. module: payment_athmovil
+#: model:payment.provider,name:payment_provider_athmovil
+msgid "ATH Móvil"
+msgstr "ATH Móvil"
+
+#. module: payment_athmovil
+#: model_terms:ir.ui.view,arch_db:payment_provider_form_athmovil
+msgid "ATH Móvil Credentials"
+msgstr "Credenciales de ATH Móvil"
+
+#. module: payment_athmovil
+#: model:ir.model.fields,field_description:payment_athmovil.field_payment_provider__athmovil_public_token
+msgid "ATH Móvil Public Token"
+msgstr "Token Público de ATH Móvil"
+
+#. module: payment_athmovil
+#: model:ir.model.fields,field_description:payment_athmovil.field_payment_provider__athmovil_private_token
+msgid "ATH Móvil Private Token"
+msgstr "Token Privado de ATH Móvil"
+
+#. module: payment_athmovil
+#: model:ir.model.fields,field_description:payment_athmovil.field_payment_transaction__athmovil_ecommerce_id
+msgid "ATH Móvil eCommerce ID"
+msgstr "ID de eCommerce de ATH Móvil"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "ATH Móvil Public Token is required when using ATH Móvil as payment provider."
+msgstr "El Token Público de ATH Móvil es requerido cuando se usa ATH Móvil como proveedor de pago."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "ATH Móvil API did not respond in time. Please try again."
+msgstr "El API de ATH Móvil no respondió a tiempo. Por favor intente de nuevo."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "ATH Móvil API returned an error. Please try again or contact support."
+msgstr "El API de ATH Móvil retornó un error. Por favor intente de nuevo o contacte soporte."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "Could not connect to ATH Móvil API. Please check your internet connection."
+msgstr "No se pudo conectar al API de ATH Móvil. Por favor verifique su conexión a internet."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "ATH Móvil payment expired — payment session was never initiated."
+msgstr "Pago de ATH Móvil expirado — la sesión de pago nunca fue iniciada."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "ATH Móvil: payment was COMPLETED in ATH Móvil app but webhook was never received. Status recovered by cron."
+msgstr "ATH Móvil: el pago fue COMPLETADO en la app de ATH Móvil pero el webhook nunca fue recibido. Estado recuperado por el cron."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "ATH Móvil payment expired — customer did not complete payment within 15 minutes."
+msgstr "Pago de ATH Móvil expirado — el cliente no completó el pago en 15 minutos."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_provider.py:0
+#, python-format
+msgid "ATH Móvil payment expired — could not verify status with ATH Móvil API."
+msgstr "Pago de ATH Móvil expirado — no se pudo verificar el estado con el API de ATH Móvil."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil payments are limited to $1,500.00 per transaction. Please contact the merchant to split this payment or use an alternative payment method."
+msgstr "Los pagos de ATH Móvil están limitados a $1,500.00 por transacción. Por favor contacte al comerciante para dividir este pago o use un método de pago alternativo."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil webhook payload is missing required fields: %s"
+msgstr "El payload del webhook de ATH Móvil no contiene los campos requeridos: %s"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil webhook ecommerceId does not match the transaction record."
+msgstr "El ecommerceId del webhook de ATH Móvil no coincide con el registro de la transacción."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil webhook amount (%.2f) does not match transaction amount (%.2f)."
+msgstr "El monto del webhook de ATH Móvil (%.2f) no coincide con el monto de la transacción (%.2f)."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil payment COMPLETED. ATH reference: %s, eCommerceId: %s"
+msgstr "Pago de ATH Móvil COMPLETADO. Referencia ATH: %s, eCommerceId: %s"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil payment %s. eCommerceId: %s"
+msgstr "Pago de ATH Móvil %s. eCommerceId: %s"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "Cannot refund: ATH Móvil eCommerce ID is not set on this transaction."
+msgstr "No se puede reembolsar: el ID de eCommerce de ATH Móvil no está establecido en esta transacción."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil refund processed. eCommerceId: %s"
+msgstr "Reembolso de ATH Móvil procesado. eCommerceId: %s"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil did not return a payment ID. Please try again."
+msgstr "ATH Móvil no retornó un ID de pago. Por favor intente de nuevo."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/models/payment_transaction.py:0
+#, python-format
+msgid "ATH Móvil payment ticket created. eCommerceId: %s"
+msgstr "Ticket de pago de ATH Móvil creado. eCommerceId: %s"
