@@ -1,4 +1,42 @@
-aidlc-docs
-aidlc-workflows-main
+# AI-DLC workflow documentation (not part of the module)
+aidlc-docs/
+aidlc-workflows-main/
 MAIN_PROMPT.md
 Plan_Maestro_ATHMovil_Odoo.docx
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Odoo
+*.pyc
+.odoo_module_installed
+filestore/
+sessions/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit credentials
+*.env
+.env.*
+secrets.json
