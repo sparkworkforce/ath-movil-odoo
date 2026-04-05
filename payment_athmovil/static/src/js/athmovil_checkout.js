@@ -18,7 +18,12 @@
  *
  * This file is registered as an ES module in __manifest__.py under assets.
  * It runs after athmovil_base.js (loaded via <script> in the QWeb template).
+ *
+ * Translations: uses _t() from @web/core/l10n/translation for all
+ * user-visible strings so they can be translated via es.po.
  */
+
+import { _t } from "@web/core/l10n/translation";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -123,27 +128,25 @@ function showPreCheckoutBanner(config) {
     return new Promise((resolve) => {
         // Create banner element
         const banner = document.createElement("div");
-        banner.id = "o_athmovil_prechecout_banner";
+        banner.id = "o_athmovil_precheckout_banner";
         banner.setAttribute("role", "alert");
-        banner.setAttribute("data-testid", "athmovil-prechecout-banner");
+        banner.setAttribute("data-testid", "athmovil-precheckout-banner");
         banner.className = "alert alert-warning alert-dismissible fade show";
         banner.style.cssText = "position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:9999;min-width:320px;max-width:600px;";
         banner.innerHTML = `
-            <strong>ATH Móvil Payment</strong><br>
-            You will need the <strong>ATH Móvil app</strong> on your phone to
-            approve this payment. The payment request will expire in
-            <strong>10 minutes</strong>.<br>
+            <strong>${_t("ATH Móvil Payment")}</strong><br>
+            ${_t("You will need the ATH Móvil app on your phone to approve this payment. The payment request will expire in 10 minutes.")}<br>
             <small>
-                Download:
+                ${_t("Download:")}
                 <a href="https://apps.apple.com/app/ath-movil/id658539297"
-                   target="_blank" rel="noopener noreferrer">App Store</a>
+                   target="_blank" rel="noopener noreferrer">${_t("App Store")}</a>
                 |
                 <a href="https://play.google.com/store/apps/details?id=com.evertec.athmovil.android"
-                   target="_blank" rel="noopener noreferrer">Google Play</a>
+                   target="_blank" rel="noopener noreferrer">${_t("Google Play")}</a>
             </small>
             <button type="button"
                     class="btn-close"
-                    aria-label="Close"
+                    aria-label="${_t("Close")}"
                     data-testid="athmovil-banner-close">
             </button>
         `;
@@ -187,7 +190,6 @@ function initAthMovilModal(config) {
         redirectTo(config.statusUrl);
         return;
     }
-
     // eslint-disable-next-line no-undef
     ATHM_Checkout.init({
         env: config.publicToken === "dummy" ? "sandbox" : "production",

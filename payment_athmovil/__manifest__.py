@@ -47,6 +47,11 @@ ATH Business support: 787-773-5466
     "depends": [
         "payment",
         "website",
+        # Note: 'sale' is NOT listed here intentionally — it is an optional
+        # integration. _athmovil_build_items_list() uses getattr() to safely
+        # access sale_order_ids only when the sale module is installed.
+        # Adding 'sale' to depends would prevent installation on Odoo instances
+        # that only have Accounting (no Sales app).
     ],
     "data": [
         # Load order matters: data first, then views
@@ -55,10 +60,14 @@ ATH Business support: 787-773-5466
         "views/payment_athmovil_templates.xml",
     ],
     "assets": {
-        # The checkout JS is loaded directly by the QWeb template via
-        # <script type="module"> — do NOT also register it in assets bundles
-        # as that would cause it to load twice on the payment page.
-        # This assets block is intentionally empty but kept for future use.
+        # The checkout JS uses _t() from @web/core/l10n/translation for
+        # translatable strings. It must be registered in the frontend bundle
+        # so Odoo's translation system can process it.
+        # The QWeb template also loads it via <script type="module"> —
+        # remove that tag from the template to avoid double loading.
+        "web.assets_frontend": [
+            "payment_athmovil/static/src/js/athmovil_checkout.js",
+        ],
     },
     "images": [
         # icon.png: ATH Móvil logo is a trademark of EVERTEC Group, LLC.

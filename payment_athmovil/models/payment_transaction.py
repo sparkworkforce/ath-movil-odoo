@@ -8,7 +8,7 @@
 import logging
 import json
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 from .payment_provider import ATH_MAX_TRANSACTION_AMOUNT
@@ -290,11 +290,40 @@ class PaymentTransaction(models.Model):
         This field has a SQL UNIQUE constraint — if a duplicate ecommerceId
         is returned (should never happen), the write will fail at the DB level.
 
+        Race condition protection: uses a row-level DB lock (SELECT FOR UPDATE NOWAIT)
+        to prevent duplicate ticket creation from concurrent requests
+        (e.g., double-click by the customer).
+
         NO automatic retries — see _athmovil_make_request docstring.
 
         :raises ValidationError: if the API call fails or returns no ecommerceId
         """
         self.ensure_one()
+
+        # Re-read the record with a row-level lock to prevent race conditions
+        # from concurrent requests (e.g., double-click). If another request
+        # already created the ticket, return early.
+        # NOWAIT raises LockNotAvailable if another transaction holds the lock —
+        # we catch it and fall through to let the caller retry or handle gracefully.
+        try:
+            self.env.cr.execute(
+                "SELECT athmovil_ecommerce_id FROM payment_transaction "
+                "WHERE id = %s FOR UPDATE NOWAIT",
+                (self.id,),
+            )
+        except Exception:
+            # Lock not available — another concurrent request is creating the ticket.
+            # Do NOT call cr.rollback() here — Odoo manages transaction savepoints
+            # automatically. Just raise a user-friendly error.
+            raise ValidationError(
+                _("ATH Móvil payment is being processed. Please wait a moment and try again.")
+            )
+        row = self.env.cr.fetchone()
+        if row and row[0]:
+            # Another concurrent request already created the ticket — use it
+            self.invalidate_recordset(["athmovil_ecommerce_id"])
+            return
+
         payload = {
             "publicToken": self.provider_id.athmovil_public_token,
             "total": self.amount,

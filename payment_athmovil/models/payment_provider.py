@@ -18,6 +18,8 @@ _logger = logging.getLogger(__name__)
 # Maximum transaction amount allowed by ATH Móvil Business per transaction (USD).
 # Source: ATH Móvil Business documentation — daily limit per business account.
 # Update this constant if ATH Móvil changes their limits.
+# FUTURE: Consider making this a configurable field on payment.provider so
+# merchants can adjust it without a module release if ATH Móvil changes limits.
 ATH_MAX_TRANSACTION_AMOUNT = 1500.00
 
 # Base URL for the ATH Móvil Business eCommerce API.
@@ -116,8 +118,17 @@ class PaymentProvider(models.Model):
 
         Odoo's payment framework calls this method to get the template ID
         for rendering the payment redirect form.
+
+        ATH Móvil does not support tokenization (_get_validation_amount returns 0),
+        so is_validation should never be True for this provider.
         """
         if self.provider_code == "athmovil":
+            if is_validation:
+                # ATH Móvil does not support tokenization — this should never happen
+                _logger.debug(
+                    "ATH Móvil: _get_redirect_form_view called with is_validation=True "
+                    "but ATH Móvil does not support tokenization."
+                )
             return self.env.ref("payment_athmovil.redirect_form")
         return super()._get_redirect_form_view(is_validation)
 

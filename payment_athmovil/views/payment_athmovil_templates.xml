@@ -107,11 +107,8 @@
 
         </div>
 
-        <!-- Load our checkout JS module after the ATH Móvil CDN script.
-             Registered as an ES module — compatible with Odoo 17/18/19 asset system. -->
-        <script type="module"
-                src="/payment_athmovil/static/src/js/athmovil_checkout.js">
-        </script>
+        <!-- athmovil_checkout.js is registered in web.assets_frontend bundle
+             via __manifest__.py — no need to load it manually here. -->
 
     </template>
 

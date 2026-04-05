@@ -148,3 +148,39 @@ msgstr "ATH Móvil no retornó un ID de pago. Por favor intente de nuevo."
 #, python-format
 msgid "ATH Móvil payment ticket created. eCommerceId: %s"
 msgstr "Ticket de pago de ATH Móvil creado. eCommerceId: %s"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "ATH Móvil Payment"
+msgstr "Pago con ATH Móvil"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "You will need the ATH Móvil app on your phone to approve this payment. The payment request will expire in 10 minutes."
+msgstr "Necesitas la app ATH Móvil en tu teléfono para aprobar este pago. La solicitud de pago expirará en 10 minutos."
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "Download:"
+msgstr "Descarga:"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "App Store"
+msgstr "App Store"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "Google Play"
+msgstr "Google Play"
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "Close"
+msgstr "Cerrar"

@@ -146,3 +146,39 @@ msgstr ""
 #, python-format
 msgid "ATH Móvil payment ticket created. eCommerceId: %s"
 msgstr ""
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "ATH Móvil Payment"
+msgstr ""
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "You will need the ATH Móvil app on your phone to approve this payment. The payment request will expire in 10 minutes."
+msgstr ""
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "Download:"
+msgstr ""
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "App Store"
+msgstr ""
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "Google Play"
+msgstr ""
+
+#. module: payment_athmovil
+#: code:addons/payment_athmovil/static/src/js/athmovil_checkout.js:0
+#, javascript-format
+msgid "Close"
+msgstr ""

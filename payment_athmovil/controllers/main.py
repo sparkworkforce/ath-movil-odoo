@@ -6,7 +6,6 @@
 # or endorsed by EVERTEC.
 
 import logging
-import pprint
 
 from odoo import http
 from odoo.http import request
@@ -59,6 +58,10 @@ class AthMovilController(http.Controller):
         Note: ATH Móvil Business API does NOT provide HMAC signatures or webhook
         secrets. Integrity is verified via the checks above, not via signature.
 
+        Note on rate limiting: this endpoint has no built-in rate limiting.
+        Configure rate limiting at the nginx/proxy level before production use
+        to prevent flood attacks on this public endpoint.
+
         Uses type="http" (not type="json") so we can return real HTTP 400 status
         codes on validation failures. type="json" routes in Odoo always return
         200 regardless of the response content.
@@ -80,7 +83,9 @@ class AthMovilController(http.Controller):
             )
 
         _logger.info(
-            "ATH Móvil webhook received:\n%s", pprint.pformat(data)
+            "ATH Móvil webhook received: ecommerceId=%s status=%s",
+            data.get("ecommerceId", "?"),
+            data.get("status", "?"),
         )
 
         # --- Step 2: Validate required fields ---
@@ -120,8 +125,15 @@ class AthMovilController(http.Controller):
             return request.make_json_response({"status": "already_processed"})
 
         # --- Step 4: Find transaction by metadata1 (Odoo reference) ---
+        # Note: sudo() is required for public webhook access, but we scope
+        # the search to the provider's company via the ecommerceId lookup above.
+        # The CROSS-INTEGRITY CHECK in _handle_feedback_data() provides an
+        # additional layer of protection against cross-company data access.
         tx = request.env["payment.transaction"].sudo().search(
-            [("reference", "=", metadata1), ("provider_code", "=", "athmovil")],
+            [
+                ("reference", "=", metadata1),
+                ("provider_code", "=", "athmovil"),
+            ],
             limit=1,
         )
         if not tx:
