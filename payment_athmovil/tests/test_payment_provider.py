@@ -74,7 +74,7 @@ class TestAthMovilProvider(TransactionCase):
         # The @api.constrains only fires when provider_code == 'athmovil'
         # Verify the constraint is scoped correctly by checking it on our provider
         # with a non-athmovil code (simulated by checking the constraint condition)
-        self.provider.provider_code  # Access to confirm field exists
+        self.provider.code  # Access to confirm field exists
         # If provider_code != 'athmovil', the constraint should not raise
         # This is verified implicitly by the constraint implementation
 
@@ -107,3 +107,41 @@ class TestAthMovilProvider(TransactionCase):
         self.assertIn("payments.athmovil.com", url)
         self.assertTrue(url.endswith("/payment"))
         self.assertTrue(url.startswith("https://"))
+
+    # -------------------------------------------------------------------------
+    # Test Connection (Feature 1)
+    # -------------------------------------------------------------------------
+
+    def test_test_connection_missing_private_token_raises(self):
+        """ValidationError when testing connection without private token."""
+        # Public token is set but private token is empty — should raise
+        # from action_athmovil_test_connection, not from the constraint.
+        self.provider.athmovil_private_token = False
+        with self.assertRaises(ValidationError):
+            self.provider.action_athmovil_test_connection()
+
+    def test_test_connection_success(self):
+        """Test connection returns notification action on success."""
+        from unittest.mock import patch
+
+        with patch.object(
+            self.provider.__class__,
+            "_athmovil_make_request",
+            side_effect=ValidationError("Transaction not found"),
+        ):
+            result = self.provider.action_athmovil_test_connection()
+            self.assertEqual(result["type"], "ir.actions.client")
+            self.assertEqual(result["tag"], "display_notification")
+            self.assertEqual(result["params"]["type"], "success")
+
+    def test_test_connection_network_error_raises(self):
+        """Network errors should propagate to the user."""
+        from unittest.mock import patch
+
+        with patch.object(
+            self.provider.__class__,
+            "_athmovil_make_request",
+            side_effect=ValidationError("Could not connect to ATH Móvil API."),
+        ):
+            with self.assertRaises(ValidationError):
+                self.provider.action_athmovil_test_connection()

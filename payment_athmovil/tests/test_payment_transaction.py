@@ -53,7 +53,7 @@ class TestAthMovilTransaction(TransactionCase):
         self.assertFalse(tx2.athmovil_ecommerce_id)
 
     # -------------------------------------------------------------------------
-    # _handle_feedback_data — CROSS-INTEGRITY CHECK (BR-03)
+    # _handle_notification_data — CROSS-INTEGRITY CHECK (BR-03)
     # -------------------------------------------------------------------------
 
     def test_handle_feedback_cross_integrity_mismatch(self):
@@ -66,7 +66,7 @@ class TestAthMovilTransaction(TransactionCase):
             "metadata1": "TEST-INTEGRITY-001",
         }
         with self.assertRaises(ValidationError):
-            tx._handle_feedback_data("athmovil", data)
+            tx._handle_notification_data("athmovil", data)
 
     def test_handle_feedback_cross_integrity_match(self):
         """No error when ecommerceId matches stored value."""
@@ -80,12 +80,12 @@ class TestAthMovilTransaction(TransactionCase):
         # Should not raise ValidationError on integrity check
         # (may raise on _set_done if state transition not allowed in test)
         try:
-            tx._handle_feedback_data("athmovil", data)
+            tx._handle_notification_data("athmovil", data)
         except ValidationError:
             self.fail("Cross-integrity check raised ValidationError unexpectedly")
 
     # -------------------------------------------------------------------------
-    # _handle_feedback_data — Amount verification (BR-04)
+    # _handle_notification_data — Amount verification (BR-04)
     # -------------------------------------------------------------------------
 
     def test_handle_feedback_amount_within_tolerance(self):
@@ -98,7 +98,7 @@ class TestAthMovilTransaction(TransactionCase):
             "metadata1": "TEST-AMT-001",
         }
         try:
-            tx._handle_feedback_data("athmovil", data)
+            tx._handle_notification_data("athmovil", data)
         except ValidationError as e:
             if "amount" in str(e).lower():
                 self.fail("Amount within tolerance raised ValidationError")
@@ -113,10 +113,10 @@ class TestAthMovilTransaction(TransactionCase):
             "metadata1": "TEST-AMT-002",
         }
         with self.assertRaises(ValidationError):
-            tx._handle_feedback_data("athmovil", data)
+            tx._handle_notification_data("athmovil", data)
 
     # -------------------------------------------------------------------------
-    # _handle_feedback_data — Missing fields (BR-09)
+    # _handle_notification_data — Missing fields (BR-09)
     # -------------------------------------------------------------------------
 
     def test_handle_feedback_missing_required_fields(self):
@@ -124,7 +124,7 @@ class TestAthMovilTransaction(TransactionCase):
         tx = self._make_tx("TEST-FIELDS-001", ecommerce_id="fields-id-001")
         data = {"ecommerceId": "fields-id-001"}  # Missing status, total, metadata1
         with self.assertRaises(ValidationError):
-            tx._handle_feedback_data("athmovil", data)
+            tx._handle_notification_data("athmovil", data)
 
     # -------------------------------------------------------------------------
     # _athmovil_build_items_list
@@ -136,3 +136,71 @@ class TestAthMovilTransaction(TransactionCase):
         items = tx._athmovil_build_items_list()
         self.assertEqual(items, [])
         self.assertIsInstance(items, list)
+
+    # -------------------------------------------------------------------------
+    # Refund tracking (Feature 4)
+    # -------------------------------------------------------------------------
+
+    def test_refund_status_default_is_none(self):
+        """New transactions should have refund_status = 'none'."""
+        tx = self._make_tx("TEST-REFUND-DEFAULT")
+        self.assertEqual(tx.athmovil_refund_status, "none")
+        self.assertEqual(tx.athmovil_refunded_amount, 0.0)
+
+    def test_refund_full_sets_status(self):
+        """Full refund should set status to 'full'."""
+        tx = self._make_tx("TEST-REFUND-FULL", amount=50.00, ecommerce_id="refund-full-001")
+        tx._set_done()
+
+        with patch.object(
+            self.provider.__class__,
+            "_athmovil_make_request",
+            return_value={"data": {"refund": {"referenceNumber": "REF-001"}}},
+        ):
+            tx._send_refund_request(amount_to_refund=50.00)
+
+        self.assertEqual(tx.athmovil_refund_status, "full")
+        self.assertEqual(tx.athmovil_refunded_amount, 50.00)
+        self.assertEqual(tx.athmovil_refund_reference, "REF-001")
+
+    def test_refund_partial_sets_status(self):
+        """Partial refund should set status to 'partial'."""
+        tx = self._make_tx("TEST-REFUND-PARTIAL", amount=100.00, ecommerce_id="refund-partial-001")
+        tx._set_done()
+
+        with patch.object(
+            self.provider.__class__,
+            "_athmovil_make_request",
+            return_value={"data": {"refund": {"referenceNumber": "REF-002"}}},
+        ):
+            tx._send_refund_request(amount_to_refund=30.00)
+
+        self.assertEqual(tx.athmovil_refund_status, "partial")
+        self.assertEqual(tx.athmovil_refunded_amount, 30.00)
+
+    def test_refund_failed_sets_status(self):
+        """Failed refund should set status to 'failed'."""
+        from odoo.exceptions import UserError
+
+        tx = self._make_tx("TEST-REFUND-FAIL", amount=25.00, ecommerce_id="refund-fail-001")
+        tx._set_done()
+
+        with patch.object(
+            self.provider.__class__,
+            "_athmovil_make_request",
+            side_effect=ValidationError("Refund failed"),
+        ):
+            with self.assertRaises(UserError):
+                tx._send_refund_request(amount_to_refund=25.00)
+
+        self.assertEqual(tx.athmovil_refund_status, "failed")
+
+    def test_refund_no_ecommerce_id_raises(self):
+        """Refund without ecommerce_id should raise UserError."""
+        from odoo.exceptions import UserError
+
+        tx = self._make_tx("TEST-REFUND-NO-ID")
+        tx._set_done()
+
+        with self.assertRaises(UserError):
+            tx._send_refund_request()

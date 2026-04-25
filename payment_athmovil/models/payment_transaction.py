@@ -43,6 +43,32 @@ class PaymentTransaction(models.Model):
         readonly=True,
     )
 
+    # Refund tracking fields (Feature 4)
+    athmovil_refund_status = fields.Selection(
+        [
+            ("none", "No Refund"),
+            ("partial", "Partially Refunded"),
+            ("full", "Fully Refunded"),
+            ("failed", "Refund Failed"),
+        ],
+        string="ATH Refund Status",
+        default="none",
+        copy=False,
+        tracking=True,
+    )
+    athmovil_refunded_amount = fields.Monetary(
+        string="ATH Refunded Amount",
+        currency_field="currency_id",
+        default=0.0,
+        copy=False,
+        readonly=True,
+    )
+    athmovil_refund_reference = fields.Char(
+        string="ATH Refund Reference",
+        copy=False,
+        readonly=True,
+    )
+
     # -------------------------------------------------------------------------
     # SQL Constraints
     # -------------------------------------------------------------------------
@@ -121,7 +147,28 @@ class PaymentTransaction(models.Model):
         )
         return res
 
-    def _handle_feedback_data(self, provider_code, data):
+    def _get_tx_from_notification_data(self, provider_code, notification_data):
+        """Find the ATH Móvil transaction from notification data.
+
+        Called by Odoo's _handle_notification_data to find the transaction
+        before calling _process_notification_data on it.
+        """
+        tx = super()._get_tx_from_notification_data(provider_code, notification_data)
+        if provider_code != "athmovil" or len(tx) == 1:
+            return tx
+
+        reference = notification_data.get("metadata1")
+        tx = self.search(
+            [("reference", "=", reference), ("provider_code", "=", "athmovil")],
+            limit=1,
+        )
+        if not tx:
+            raise ValidationError(
+                _("ATH Móvil: No transaction found for reference %s.") % reference
+            )
+        return tx
+
+    def _process_notification_data(self, notification_data):
         """Process the ATH Móvil webhook payload and update transaction state.
 
         This method is called by the webhook controller (UNIT-2) AFTER the
@@ -134,15 +181,16 @@ class PaymentTransaction(models.Model):
         spoofing attack where an attacker sends a valid ecommerceId paired
         with a different metadata1 to hijack another merchant's transaction.
 
-        :param provider_code: str — must be 'athmovil'
-        :param data: dict — webhook payload from ATH Móvil
+        
+        :param notification_data: dict — webhook payload from ATH Móvil
         """
-        if provider_code != "athmovil":
-            return super()._handle_feedback_data(provider_code, data)
+        super()._process_notification_data(notification_data)
+        if self.provider_code != "athmovil":
+            return
 
         # --- Step 1: Validate required fields are present in the payload ---
         required_fields = {"ecommerceId", "status", "total", "metadata1"}
-        missing = required_fields - set(data.keys())
+        missing = required_fields - set(notification_data.keys())
         if missing:
             _logger.warning(
                 "ATH Móvil webhook: missing required fields %s for tx %s",
@@ -158,12 +206,12 @@ class PaymentTransaction(models.Model):
         # this transaction. The controller found this transaction via metadata1;
         # if an attacker crafted a webhook with a valid ecommerceId but wrong
         # metadata1, they could reach a different transaction. This check stops that.
-        if data["ecommerceId"] != self.athmovil_ecommerce_id:
+        if notification_data["ecommerceId"] != self.athmovil_ecommerce_id:
             _logger.warning(
                 "ATH Móvil webhook: ecommerceId mismatch for tx %s. "
                 "Webhook: %s, Stored: %s — possible spoofing attempt.",
                 self.reference,
-                data["ecommerceId"],
+                notification_data["ecommerceId"],
                 self.athmovil_ecommerce_id,
             )
             raise ValidationError(
@@ -171,7 +219,12 @@ class PaymentTransaction(models.Model):
             )
 
         # --- Step 3: Amount verification (tolerance ±$0.01 for float rounding) ---
-        webhook_total = float(data.get("total", 0))
+        try:
+            webhook_total = float(notification_data.get("total", 0))
+        except (ValueError, TypeError):
+            raise ValidationError(
+                _("ATH Móvil webhook: invalid 'total' value.")
+            )
         if abs(webhook_total - self.amount) > ATH_AMOUNT_TOLERANCE:
             _logger.warning(
                 "ATH Móvil webhook: amount mismatch for tx %s. "
@@ -189,8 +242,8 @@ class PaymentTransaction(models.Model):
             )
 
         # --- Step 4: Update transaction state based on ATH Móvil status ---
-        ath_status = data.get("status", "")
-        reference_number = data.get("referenceNumber", "")
+        ath_status = notification_data.get("status", "")
+        reference_number = notification_data.get("referenceNumber", "")
 
         if ath_status == "COMPLETED":
             self._set_done()
@@ -229,54 +282,77 @@ class PaymentTransaction(models.Model):
                 self.reference,
             )
 
-    def _send_refund_request(self, amount_to_refund=None):
+    def _send_refund_request(self, amount_to_refund=None, **kwargs):
         """Send a refund request to ATH Móvil via POST /refund.
 
-        RF-07 PROVISIONAL DECISION (Opción B):
-        Partial refunds are not yet confirmed as supported by the ATH Móvil API.
-        Until Gate 0 verification confirms partial refund support, this method
-        only processes full refunds. The amount_to_refund parameter is accepted
-        but ignored — the full transaction amount is always refunded.
-
-        If Gate 0 confirms partial refund support, update this method to pass
-        amount_to_refund in the payload and update the UI accordingly.
+        Supports both full and partial refunds. Tracks cumulative refunded
+        amount and updates refund status (partial/full/failed).
 
         NO automatic retries — retrying a refund can create duplicate refunds
         if the first request succeeded but the response was lost.
 
-        :param amount_to_refund: float | None — ignored in current implementation
+        :param amount_to_refund: float | None — amount to refund. Defaults to
+                                 full transaction amount if None.
         :raises UserError: if the ATH Móvil API returns a refund error
         """
         self.ensure_one()
 
         if self.provider_code != "athmovil":
-            return super()._send_refund_request(amount_to_refund)
+            return super()._send_refund_request(amount_to_refund=amount_to_refund, **kwargs)
 
         if not self.athmovil_ecommerce_id:
             raise UserError(
                 _("Cannot refund: ATH Móvil eCommerce ID is not set on this transaction.")
             )
 
-        # RF-07 Opción B: full refund only (provisional)
-        # TODO: When Gate 0 confirms partial refund support, add:
-        #   payload["amount"] = amount_to_refund
+        refund_amount = amount_to_refund if amount_to_refund is not None else self.amount
         payload = {
             "ecommerceId": self.athmovil_ecommerce_id,
+            "amount": round(refund_amount, 2),
         }
 
         try:
-            self.provider_id._athmovil_make_request("refund", payload, "POST")
+            result = self.provider_id._athmovil_make_request("refund", payload, "POST")
         except ValidationError as exc:
-            # Re-raise as UserError so Odoo displays it in the UI
+            self.athmovil_refund_status = "failed"
+            self.message_post(
+                body=_("ATH Móvil refund FAILED: %s") % str(exc)
+            )
             raise UserError(str(exc)) from exc
 
+        # Track refund
+        self.athmovil_refunded_amount += refund_amount
+        refund_ref = ""
+        if isinstance(result, dict):
+            data = result.get("data", result)
+            refund_info = data.get("refund", data)
+            refund_ref = refund_info.get("referenceNumber", "")
+        if refund_ref:
+            self.athmovil_refund_reference = refund_ref
+
+        if self.athmovil_refunded_amount >= self.amount:
+            self.athmovil_refund_status = "full"
+        else:
+            self.athmovil_refund_status = "partial"
+
         self.message_post(
-            body=_("ATH Móvil refund processed. eCommerceId: %s") % self.athmovil_ecommerce_id
+            body=_(
+                "ATH Móvil refund processed: $%(amount).2f. "
+                "Total refunded: $%(total).2f / $%(original).2f. "
+                "Reference: %(ref)s"
+            ) % {
+                "amount": refund_amount,
+                "total": self.athmovil_refunded_amount,
+                "original": self.amount,
+                "ref": refund_ref or "N/A",
+            }
         )
         _logger.info(
-            "ATH Móvil: refund processed for transaction %s (eCommerceId: %s)",
+            "ATH Móvil: refund $%.2f for tx %s (eCommerceId: %s, ref: %s)",
+            refund_amount,
             self.reference,
             self.athmovil_ecommerce_id,
+            refund_ref,
         )
 
     # -------------------------------------------------------------------------
@@ -311,13 +387,15 @@ class PaymentTransaction(models.Model):
                 "WHERE id = %s FOR UPDATE NOWAIT",
                 (self.id,),
             )
-        except Exception:
-            # Lock not available — another concurrent request is creating the ticket.
-            # Do NOT call cr.rollback() here — Odoo manages transaction savepoints
-            # automatically. Just raise a user-friendly error.
-            raise ValidationError(
-                _("ATH Móvil payment is being processed. Please wait a moment and try again.")
-            )
+        except Exception as lock_exc:
+            # Narrow check: only treat lock-related errors as "being processed".
+            # psycopg2 LockNotAvailable has pgcode='55P03'.
+            pgcode = getattr(lock_exc, "pgcode", "")
+            if pgcode == "55P03":
+                raise ValidationError(
+                    _("ATH Móvil payment is being processed. Please wait a moment and try again.")
+                )
+            raise  # Re-raise unexpected DB errors
         row = self.env.cr.fetchone()
         if row and row[0]:
             # Another concurrent request already created the ticket — use it

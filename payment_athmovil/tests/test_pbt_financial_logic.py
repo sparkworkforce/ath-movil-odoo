@@ -226,11 +226,11 @@ class TestAthMovilPBT(TransactionCase):
             }
 
             # First processing
-            tx._handle_feedback_data("athmovil", data)
+            tx._handle_notification_data("athmovil", data)
             state_after_first = tx.state
 
             # Second processing — should produce same state (idempotent)
-            tx._handle_feedback_data("athmovil", data)
+            tx._handle_notification_data("athmovil", data)
             state_after_second = tx.state
 
             self.assertEqual(

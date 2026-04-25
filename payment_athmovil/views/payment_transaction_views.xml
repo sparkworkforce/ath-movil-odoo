@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Part of payment_athmovil. See LICENSE file for full copyright and licensing details. -->
+<odoo>
+
+    <!-- ===================================================================
+         ATH Móvil Transaction Form — Refund tracking + chatter (Feature 4+6)
+         =================================================================== -->
+    <record id="payment_transaction_form_athmovil" model="ir.ui.view">
+        <field name="name">payment.transaction.form.athmovil</field>
+        <field name="model">payment.transaction</field>
+        <field name="inherit_id" ref="payment.payment_transaction_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='provider_id']" position="after">
+                <field name="athmovil_ecommerce_id"
+                       invisible="provider_code != 'athmovil'"
+                       readonly="1"/>
+                <field name="athmovil_refund_status"
+                       invisible="provider_code != 'athmovil'"
+                       readonly="1"
+                       widget="badge"
+                       decoration-success="athmovil_refund_status == 'full'"
+                       decoration-warning="athmovil_refund_status == 'partial'"
+                       decoration-danger="athmovil_refund_status == 'failed'"/>
+                <field name="athmovil_refunded_amount"
+                       invisible="provider_code != 'athmovil' or athmovil_refund_status == 'none'"
+                       readonly="1"/>
+                <field name="athmovil_refund_reference"
+                       invisible="provider_code != 'athmovil' or not athmovil_refund_reference"
+                       readonly="1"/>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ===================================================================
+         ATH Móvil Analytics — Tree view (Feature 5)
+         =================================================================== -->
+    <record id="payment_transaction_tree_athmovil" model="ir.ui.view">
+        <field name="name">payment.transaction.tree.athmovil</field>
+        <field name="model">payment.transaction</field>
+        <field name="arch" type="xml">
+            <tree string="ATH Móvil Transactions" decoration-success="state == 'done'"
+                  decoration-danger="state == 'cancel'" decoration-warning="state == 'pending'">
+                <field name="create_date" string="Date"/>
+                <field name="reference"/>
+                <field name="partner_id"/>
+                <field name="amount" sum="Total"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-danger="state == 'cancel'"
+                       decoration-warning="state == 'pending'"/>
+                <field name="athmovil_ecommerce_id" string="ATH ID"/>
+                <field name="athmovil_refund_status" string="Refund"
+                       widget="badge"
+                       decoration-success="athmovil_refund_status == 'full'"
+                       decoration-warning="athmovil_refund_status == 'partial'"
+                       decoration-danger="athmovil_refund_status == 'failed'"
+                       optional="show"/>
+                <field name="athmovil_refunded_amount" string="Refunded" sum="Total Refunded"
+                       optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ===================================================================
+         ATH Móvil Analytics — Pivot view (Feature 5)
+         =================================================================== -->
+    <record id="payment_transaction_pivot_athmovil" model="ir.ui.view">
+        <field name="name">payment.transaction.pivot.athmovil</field>
+        <field name="model">payment.transaction</field>
+        <field name="arch" type="xml">
+            <pivot string="ATH Móvil Analytics">
+                <field name="create_date" type="row" interval="month"/>
+                <field name="state" type="col"/>
+                <field name="amount" type="measure"/>
+                <field name="athmovil_refunded_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- ===================================================================
+         ATH Móvil Analytics — Graph view (Feature 5)
+         =================================================================== -->
+    <record id="payment_transaction_graph_athmovil" model="ir.ui.view">
+        <field name="name">payment.transaction.graph.athmovil</field>
+        <field name="model">payment.transaction</field>
+        <field name="arch" type="xml">
+            <graph string="ATH Móvil Payment Volume" type="bar" stacked="True">
+                <field name="create_date" type="row" interval="week"/>
+                <field name="amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- ===================================================================
+         ATH Móvil Analytics — Search view (Feature 5)
+         =================================================================== -->
+    <record id="payment_transaction_search_athmovil" model="ir.ui.view">
+        <field name="name">payment.transaction.search.athmovil</field>
+        <field name="model">payment.transaction</field>
+        <field name="arch" type="xml">
+            <search string="ATH Móvil Transactions">
+                <field name="reference"/>
+                <field name="partner_id"/>
+                <field name="athmovil_ecommerce_id"/>
+                <filter name="filter_completed" string="Completed"
+                        domain="[('state', '=', 'done')]"/>
+                <filter name="filter_pending" string="Pending"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="filter_cancelled" string="Cancelled"
+                        domain="[('state', '=', 'cancel')]"/>
+                <separator/>
+                <filter name="filter_refunded" string="Refunded"
+                        domain="[('athmovil_refund_status', 'in', ['partial', 'full'])]"/>
+                <filter name="filter_refund_failed" string="Refund Failed"
+                        domain="[('athmovil_refund_status', '=', 'failed')]"/>
+                <separator/>
+                <filter name="filter_today" string="Today"
+                        domain="[('create_date', '>=', (context_today()).strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_this_week" string="This Week"
+                        domain="[('create_date', '>=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_this_month" string="This Month"
+                        domain="[('create_date', '>=', context_today().strftime('%Y-%m-01'))]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter name="groupby_state" string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="groupby_partner" string="Customer"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="groupby_date" string="Date"
+                            context="{'group_by': 'create_date:month'}"/>
+                    <filter name="groupby_refund" string="Refund Status"
+                            context="{'group_by': 'athmovil_refund_status'}"/>
+                    <filter name="groupby_company" string="Company"
+                            context="{'group_by': 'company_id'}"
+                            groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ===================================================================
+         ATH Móvil Analytics — Menu action (Feature 5)
+         =================================================================== -->
+    <record id="action_athmovil_payment_analytics" model="ir.actions.act_window">
+        <field name="name">ATH Móvil Payments</field>
+        <field name="res_model">payment.transaction</field>
+        <field name="view_mode">tree,pivot,graph,form</field>
+        <field name="domain">[('provider_code', '=', 'athmovil')]</field>
+        <field name="context">{
+            'search_default_filter_completed': 1,
+            'default_provider_code': 'athmovil',
+        }</field>
+        <field name="search_view_id" ref="payment_transaction_search_athmovil"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No ATH Móvil transactions yet
+            </p>
+            <p>
+                ATH Móvil payments will appear here once customers start paying.
+            </p>
+        </field>
+    </record>
+
+    <!-- Bind specific views to the action -->
+    <record id="action_athmovil_payment_analytics_tree" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="payment_transaction_tree_athmovil"/>
+        <field name="act_window_id" ref="action_athmovil_payment_analytics"/>
+    </record>
+    <record id="action_athmovil_payment_analytics_pivot" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">pivot</field>
+        <field name="view_id" ref="payment_transaction_pivot_athmovil"/>
+        <field name="act_window_id" ref="action_athmovil_payment_analytics"/>
+    </record>
+    <record id="action_athmovil_payment_analytics_graph" model="ir.actions.act_window.view">
+        <field name="sequence">3</field>
+        <field name="view_mode">graph</field>
+        <field name="view_id" ref="payment_transaction_graph_athmovil"/>
+        <field name="act_window_id" ref="action_athmovil_payment_analytics"/>
+    </record>
+
+    <!-- ===================================================================
+         Menu entry under Accounting > Payments (Feature 5)
+         =================================================================== -->
+    <menuitem id="menu_athmovil_payments"
+              name="ATH Móvil"
+              parent="account.menu_finance_receivables"
+              action="action_athmovil_payment_analytics"
+              sequence="30"
+              groups="account.group_account_user"/>
+
+</odoo>

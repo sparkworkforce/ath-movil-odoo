@@ -237,3 +237,38 @@ Si el webhook no está configurado, el módulo usará polling frontend como resp
 **Spark Workforce LLC**
 - Sitio web: [sparkworkforcellc.com](https://www.sparkworkforcellc.com)
 - Soporte: [jvelez@sparkworkforcellc.com](mailto:jvelez@sparkworkforcellc.com)
+
+---
+
+## Production Deployment — Rate Limiting
+
+The module exposes three public HTTP endpoints that should be rate-limited at the reverse proxy level before production use:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/payment/athmovil/webhook` | POST | ATH Móvil payment notifications |
+| `/payment/athmovil/return` | POST | Frontend callback after payment |
+| `/payment/athmovil/check_status` | GET | Frontend polling fallback |
+
+**Recommended nginx configuration:**
+
+```nginx
+# Rate limiting for ATH Móvil payment endpoints
+limit_req_zone $binary_remote_addr zone=athmovil_webhook:10m rate=5r/s;
+limit_req_zone $binary_remote_addr zone=athmovil_poll:10m rate=2r/s;
+
+location /payment/athmovil/webhook {
+    limit_req zone=athmovil_webhook burst=10 nodelay;
+    proxy_pass http://odoo_backend;
+}
+
+location /payment/athmovil/check_status {
+    limit_req zone=athmovil_poll burst=5 nodelay;
+    proxy_pass http://odoo_backend;
+}
+
+location /payment/athmovil/return {
+    limit_req zone=athmovil_poll burst=5 nodelay;
+    proxy_pass http://odoo_backend;
+}
+```

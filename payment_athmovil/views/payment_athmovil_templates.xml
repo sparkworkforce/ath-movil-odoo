@@ -1,84 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Part of payment_athmovil. See LICENSE file for full copyright and licensing details. -->
-<!--
-    ATH Móvil® is a registered trademark of EVERTEC Group, LLC.
-    This module is an independent integration and is not affiliated with
-    or endorsed by EVERTEC.
--->
 <odoo>
 
-    <!-- QWeb template for the ATH Móvil payment redirect form.
-         Odoo's payment framework renders this template inside its own layout
-         when the customer selects ATH Móvil as their payment method.
-         The template ID must match what _get_redirect_form_view() returns.
-
-         Data passed from _get_specific_processing_values():
-           - public_token    : merchant's ATH Business public token
-           - amount          : transaction total (float)
-           - subtotal        : transaction subtotal (float)
-           - tax             : tax amount (float)
-           - metadata1       : Odoo transaction reference
-           - metadata2       : company name
-           - items           : list of order line dicts
-           - ecommerce_id    : ATH Móvil ecommerceId (set after ticket creation)
-    -->
+    <!-- ATH Móvil payment redirect form -->
     <template id="redirect_form" name="ATH Móvil Payment Form">
 
-        <!-- Load the ATH Móvil modal JS from their CDN.
-             This script provides the global ATHM_Checkout object.
-             Note: ATH Móvil does not currently provide SRI hashes for this
-             script. Add integrity= attribute when ATH Móvil publishes one
-             (SECURITY-13 compliance). -->
+        <!--
+            SECURITY (MED #8): The ATH Móvil CDN script cannot use SRI because
+            it auto-updates with no stable hash. Instead we apply a Content
+            Security Policy that restricts the script to only connect back to
+            ATH Móvil's own domain and the current origin. A compromised CDN
+            script cannot exfiltrate data to attacker-controlled servers.
+        -->
+        <meta http-equiv="Content-Security-Policy"
+              content="connect-src 'self' https://payments.athmovil.com https://*.athmovil.com https://*.firebaseio.com https://*.googleapis.com; frame-src https://payments.athmovil.com https://*.athmovil.com;"/>
+
+        <!-- ATH Móvil modal JS from CDN -->
         <script type="text/javascript"
-                src="https://payments.athmovil.com/api/modal/js/athmovil_base.js">
-        </script>
+                src="https://payments.athmovil.com/api/modal/js/athmovil_base.js"/>
 
         <div class="o_payment_athmovil_form">
 
-            <!-- ============================================================
-                 LEGAL NOTICE FOR END CUSTOMER (RF-10, Gap 3)
-                 Visible to the customer BEFORE the payment button.
-                 Required by legal constraints — must appear on the payment form.
-                 ============================================================ -->
-            <div class="alert alert-info o_athmovil_legal_notice" role="alert">
-                <p>
-                    By paying with ATH Móvil you agree to
-                    <a href="https://ath.business/terminos" target="_blank">
-                        ATH Business Terms
-                    </a>.
-                    You must have an active ATH Móvil account and the
-                    <strong>ATH Móvil app</strong> installed on your phone
-                    to complete this payment.
-                </p>
-                <p>
-                    <strong>Download the app:</strong>
-                    <a href="https://apps.apple.com/app/ath-movil/id658539297"
-                       target="_blank">App Store</a>
-                    |
-                    <a href="https://play.google.com/store/apps/details?id=com.evertec.athmovil.android"
-                       target="_blank">Google Play</a>
-                </p>
+            <!-- Inline info notice -->
+            <div class="alert alert-info d-flex align-items-start o_athmovil_info_notice"
+                 role="alert" data-testid="athmovil-info-notice">
+                <span class="me-2" style="font-size:1.5rem;">&#x1f4f1;</span>
+                <div>
+                    <strong t-out="'ATH Móvil'"/>
+                    — You'll need the ATH Móvil app to approve this payment.
+                    The request expires in 10 minutes.
+                    <br/>
+                    <small class="text-muted">
+                        Don't have it?
+                        <a href="https://apps.apple.com/app/ath-movil/id658539297"
+                           target="_blank" rel="noopener">App Store</a> ·
+                        <a href="https://play.google.com/store/apps/details?id=com.evertec.athmovil.android"
+                           target="_blank" rel="noopener">Google Play</a>
+                    </small>
+                </div>
             </div>
 
-            <!-- ============================================================
-                 PAYMENT BUTTON
-                 The actual ATHM_Checkout initialization happens in
-                 athmovil_checkout.js after the pre-checkout banner is shown.
-                 ============================================================ -->
+            <!-- Payment amount summary -->
+            <div class="text-center mb-3" data-testid="athmovil-amount-display">
+                <span class="text-muted">Total:</span>
+                <strong class="fs-3" t-out="'$%.2f' % amount"/>
+            </div>
+
+            <!-- Legal notice (compact) -->
+            <p class="text-muted small text-center">
+                By paying you agree to
+                <a href="https://ath.business/terminos" target="_blank">ATH Business Terms</a>.
+            </p>
+
+            <!-- Payment button -->
             <div class="o_athmovil_payment_container text-center mt-3">
                 <button id="ATHMovil_Checkout_Button"
                         class="btn btn-primary btn-lg o_athmovil_pay_btn"
                         data-testid="athmovil-pay-button">
-                    Pay with ATH Móvil
+                    <span class="o_athmovil_btn_label">Pay with ATH Móvil</span>
+                    <span class="o_athmovil_btn_loading d-none">
+                        <span class="spinner-border spinner-border-sm me-1" role="status"/>
+                        Opening ATH Móvil...
+                    </span>
                 </button>
             </div>
 
-            <!-- ============================================================
-                 DATA CONTAINER
-                 Passes server-side values to athmovil_checkout.js via
-                 data- attributes. Avoids inline JS and keeps the template
-                 clean and testable.
-                 ============================================================ -->
+            <!-- Data container -->
             <div id="o_athmovil_data"
                  class="d-none"
                  data-testid="athmovil-data-container"
@@ -92,23 +79,19 @@
                  t-att-data-items="items"
                  data-return-url="/payment/athmovil/return"
                  data-check-status-url="/payment/athmovil/check_status"
-                 data-status-url="/payment/status">
-            </div>
+                 data-status-url="/payment/status"/>
 
-            <!-- Loading spinner shown while the modal initializes -->
+            <!-- Loading state -->
             <div id="o_athmovil_loading"
-                 class="text-center mt-3 d-none"
+                 class="text-center mt-4 d-none"
                  data-testid="athmovil-loading-spinner">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <p class="mt-2 text-muted">Opening ATH Móvil payment...</p>
+                <p class="mt-2 text-muted">Connecting to ATH Móvil...</p>
             </div>
 
         </div>
-
-        <!-- athmovil_checkout.js is registered in web.assets_frontend bundle
-             via __manifest__.py — no need to load it manually here. -->
 
     </template>
 

@@ -70,7 +70,7 @@ class PaymentProvider(models.Model):
     # Constraints
     # -------------------------------------------------------------------------
 
-    @api.constrains("athmovil_public_token", "provider_code")
+    @api.constrains("athmovil_public_token", "code")
     def _check_athmovil_public_token(self):
         """Enforce that public token is set whenever ATH Móvil is the active provider.
 
@@ -79,7 +79,7 @@ class PaymentProvider(models.Model):
         The view XML also sets required="code == 'athmovil'" for UI-side validation.
         """
         for provider in self:
-            if provider.provider_code == "athmovil" and not provider.athmovil_public_token:
+            if provider.code == "athmovil" and not provider.athmovil_public_token:
                 raise ValidationError(
                     _(
                         "ATH Móvil Public Token is required when using "
@@ -98,7 +98,7 @@ class PaymentProvider(models.Model):
         support other currencies at this time.
         """
         supported = super()._get_supported_currencies()
-        if self.provider_code == "athmovil":
+        if self.code == "athmovil":
             supported = supported.filtered(lambda c: c.name == "USD")
         return supported
 
@@ -109,7 +109,7 @@ class PaymentProvider(models.Model):
         active approval from the customer in the ATH Móvil app.
         Returning 0 skips the validation charge that Odoo uses for tokenization.
         """
-        if self.provider_code == "athmovil":
+        if self.code == "athmovil":
             return 0.0
         return super()._get_validation_amount()
 
@@ -122,7 +122,7 @@ class PaymentProvider(models.Model):
         ATH Móvil does not support tokenization (_get_validation_amount returns 0),
         so is_validation should never be True for this provider.
         """
-        if self.provider_code == "athmovil":
+        if self.code == "athmovil":
             if is_validation:
                 # ATH Móvil does not support tokenization — this should never happen
                 _logger.debug(
@@ -131,6 +131,49 @@ class PaymentProvider(models.Model):
                 )
             return self.env.ref("payment_athmovil.redirect_form")
         return super()._get_redirect_form_view(is_validation)
+
+    # -------------------------------------------------------------------------
+    # Test Connection (Feature 1 — Merchant onboarding)
+    # -------------------------------------------------------------------------
+
+    def action_athmovil_test_connection(self):
+        """Test ATH Móvil API credentials by calling findPayment with a dummy ID.
+
+        A successful HTTP connection (even with 'not found' error) proves
+        credentials are valid and the network path works.
+        """
+        self.ensure_one()
+        if not self.athmovil_public_token or not self.athmovil_private_token:
+            raise ValidationError(
+                _("Please enter both Public Token and Private Token before testing.")
+            )
+        try:
+            self._athmovil_make_request(
+                "business/findPayment",
+                payload={
+                    "publicToken": self.athmovil_public_token,
+                    "ecommerceId": "test-connection-00000000",
+                },
+                method="POST",
+            )
+        except ValidationError as exc:
+            error_msg = str(exc)
+            if "did not respond" in error_msg or "Could not connect" in error_msg:
+                raise
+            # API error like "transaction not found" = credentials work
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Connection Successful"),
+                "message": _(
+                    "ATH Móvil API is reachable and your credentials are valid."
+                ),
+                "type": "success",
+                "sticky": False,
+            },
+        }
 
     # -------------------------------------------------------------------------
     # ATH Móvil API helpers
@@ -202,7 +245,7 @@ class PaymentProvider(models.Model):
                 method,
                 endpoint,
                 exc.response.status_code,
-                exc.response.text,
+                exc.response.text[:500],  # Truncated for security
             )
             raise ValidationError(
                 _("ATH Móvil API returned an error. Please try again or contact support.")
@@ -295,8 +338,8 @@ class PaymentProvider(models.Model):
                     )
                     cancelled_count += 1
 
-            except Exception as exc:
-                # If we can't reach ATH Móvil API, cancel conservatively and log.
+            except (ValidationError, requests.exceptions.RequestException) as exc:
+                # Network/API errors: cancel conservatively and log.
                 # Better to cancel and let the merchant re-issue than to leave
                 # the transaction in limbo indefinitely.
                 _logger.warning(
