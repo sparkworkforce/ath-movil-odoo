@@ -31,7 +31,7 @@ class PaymentTransaction(models.Model):
     # This field is the cornerstone of idempotency:
     #   - Set once when the payment ticket is created
     #   - Used by the webhook controller to detect duplicate deliveries
-    #   - Used by _handle_feedback_data for cross-integrity verification
+    #   - Used by _process_notification_data for cross-integrity verification
     #
     # SQL UNIQUE constraint (see _sql_constraints below) allows multiple NULLs —
     # this is correct PostgreSQL behavior and intentional: the field is NULL
@@ -89,7 +89,7 @@ class PaymentTransaction(models.Model):
     # Override: payment.transaction base methods
     # -------------------------------------------------------------------------
 
-    def _get_specific_processing_values(self):
+    def _get_specific_rendering_values(self, processing_values):
         """Return ATH Móvil-specific values needed to initialize ATHM_Checkout.
 
         This method is called by Odoo's payment framework when rendering the
@@ -105,8 +105,8 @@ class PaymentTransaction(models.Model):
           source tree. Use hasattr() guards rather than version checks.
         """
         # hasattr() guard for forward compatibility with Odoo 19+
-        if hasattr(super(), "_get_specific_processing_values"):
-            res = super()._get_specific_processing_values()
+        if hasattr(super(), "_get_specific_rendering_values"):
+            res = super()._get_specific_rendering_values(processing_values)
         else:
             res = {}
 
@@ -247,6 +247,19 @@ class PaymentTransaction(models.Model):
 
         if ath_status == "COMPLETED":
             self._set_done()
+            # Send email receipt to customer
+            try:
+                template = self.env.ref(
+                    "payment_athmovil.mail_template_athmovil_receipt",
+                    raise_if_not_found=False,
+                )
+                if template and self.partner_email:
+                    template.send_mail(self.id, force_send=False)
+            except Exception:
+                _logger.warning(
+                    "ATH Móvil: could not send receipt email for tx %s",
+                    self.reference,
+                )
             self.message_post(
                 body=_(
                     "ATH Móvil payment COMPLETED. "
@@ -300,6 +313,9 @@ class PaymentTransaction(models.Model):
         if self.provider_code != "athmovil":
             return super()._send_refund_request(amount_to_refund=amount_to_refund, **kwargs)
 
+        # Create child refund transaction via Odoo's standard pipeline
+        refund_tx = super()._send_refund_request(amount_to_refund=amount_to_refund, **kwargs)
+
         if not self.athmovil_ecommerce_id:
             raise UserError(
                 _("Cannot refund: ATH Móvil eCommerce ID is not set on this transaction.")
@@ -318,7 +334,7 @@ class PaymentTransaction(models.Model):
             self.message_post(
                 body=_("ATH Móvil refund FAILED: %s") % str(exc)
             )
-            raise UserError(str(exc)) from exc
+            raise UserError(str(exc)) from exc  # refund_tx still returned by caller
 
         # Track refund
         self.athmovil_refunded_amount += refund_amount
@@ -354,6 +370,7 @@ class PaymentTransaction(models.Model):
             self.athmovil_ecommerce_id,
             refund_ref,
         )
+        return refund_tx
 
     # -------------------------------------------------------------------------
     # ATH Móvil-specific methods
@@ -480,3 +497,19 @@ class PaymentTransaction(models.Model):
                 )
 
         return items
+
+    # -------------------------------------------------------------------------
+    # QR Code Payment (Feature 4)
+    # -------------------------------------------------------------------------
+
+    def _athmovil_get_qr_url(self):
+        """Return a URL that generates a QR code image for this transaction.
+
+        The QR encodes the ATH Móvil payment link that the customer scans
+        with their ATH Móvil app.
+        """
+        self.ensure_one()
+        if not self.athmovil_ecommerce_id:
+            return False
+        base_url = self.provider_id.get_base_url()
+        return "%s/payment/athmovil/qr/%s" % (base_url, self.athmovil_ecommerce_id)

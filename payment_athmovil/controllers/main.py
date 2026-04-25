@@ -47,7 +47,7 @@ class AthMovilController(http.Controller):
         3. Idempotency check — already processed → 200
         4. Transaction lookup by metadata1
         5. Server-side verification via GET /findPayment (HIGH fix #2)
-        6. Cross-integrity check + amount verification in _handle_feedback_data
+        6. Cross-integrity check + amount verification in _process_notification_data
         """
         # --- Step 1: Parse JSON ---
         try:
@@ -217,12 +217,11 @@ class AthMovilController(http.Controller):
                 {"error": "Transaction not found"}, status=400
             )
 
-        redirect_url = "/payment/status"
+        redirect_url = "/payment/athmovil/status?ecommerce_id=%s" % ecommerce_id
         _logger.info(
-            "ATH Móvil return: tx %s (state: %s) → %s",
+            "ATH Móvil return: tx %s (state: %s) → branded status page",
             tx.reference,
             tx.state,
-            redirect_url,
         )
         return request.make_json_response({"redirect_url": redirect_url})
 
@@ -272,21 +271,25 @@ class AthMovilController(http.Controller):
 
         if tx.state == "done":
             return request.make_json_response(
-                {"status": "COMPLETED", "redirect_url": "/payment/status"}
+                {"status": "COMPLETED", "redirect_url": "/payment/athmovil/status?ecommerce_id=%s" % ecommerce_id}
             )
         if tx.state == "cancel":
             return request.make_json_response(
-                {"status": "CANCELLED", "redirect_url": "/payment/status"}
+                {"status": "CANCELLED", "redirect_url": "/payment/athmovil/status?ecommerce_id=%s" % ecommerce_id}
             )
 
         # Pending — query ATH Móvil for real-time status
         try:
             result = tx.provider_id._athmovil_make_request(
-                "findPayment",
-                payload={"ecommerceId": ecommerce_id},
-                method="GET",
+                "business/findPayment",
+                payload={
+                    "publicToken": tx.provider_id.athmovil_public_token,
+                    "ecommerceId": ecommerce_id,
+                },
+                method="POST",
             )
-            ath_status = result.get("status", "IN_PROCESS")
+            data = result.get("data", result)
+            ath_status = data.get("ecommerceStatus", "OPEN")
         except Exception as exc:
             _logger.warning(
                 "ATH Móvil check_status: API unreachable for ecommerceId=%s: %s",
@@ -299,8 +302,107 @@ class AthMovilController(http.Controller):
 
         redirect_url = None
         if ath_status in ("COMPLETED", "CANCELLED", "EXPIRED"):
-            redirect_url = "/payment/status"
+            redirect_url = "/payment/athmovil/status?ecommerce_id=%s" % ecommerce_id
 
         return request.make_json_response(
             {"status": ath_status, "redirect_url": redirect_url}
         )
+
+    # -------------------------------------------------------------------------
+    # Route 4: ATH-branded payment status page
+    # -------------------------------------------------------------------------
+
+    @http.route(
+        "/payment/athmovil/status",
+        type="http",
+        auth="public",
+        methods=["GET"],
+        website=True,
+    )
+    def athmovil_status_page(self, ecommerce_id=None, **kwargs):
+        """Render ATH Móvil-branded success/failure/expired page."""
+        tx = None
+        status = "cancel"
+        if ecommerce_id:
+            tx = request.env["payment.transaction"].sudo().search(
+                [
+                    ("athmovil_ecommerce_id", "=", ecommerce_id),
+                    ("provider_code", "=", "athmovil"),
+                ],
+                limit=1,
+            )
+        if tx:
+            if tx.state == "done":
+                status = "done"
+            elif tx.state == "pending":
+                status = "pending"
+            elif tx.state == "cancel":
+                # Distinguish expired from cancelled
+                status = "expired" if "expired" in (tx.state_message or "").lower() else "cancel"
+            else:
+                status = "cancel"
+        return request.render(
+            "payment_athmovil.payment_status_page",
+            {"tx": tx, "status": status},
+        )
+
+    # -------------------------------------------------------------------------
+    # Route 5: QR Code image for ATH Móvil payment
+    # -------------------------------------------------------------------------
+
+    @http.route(
+        "/payment/athmovil/qr/<string:ecommerce_id>",
+        type="http",
+        auth="public",
+        methods=["GET"],
+        csrf=False,
+    )
+    def athmovil_qr_code(self, ecommerce_id, **kwargs):
+        """Generate a QR code PNG image encoding the ATH Móvil payment URL.
+
+        The QR contains a deep link that opens the ATH Móvil app when scanned.
+        Uses Python's qrcode library (falls back to a simple SVG if unavailable).
+        """
+        tx = request.env["payment.transaction"].sudo().search(
+            [
+                ("athmovil_ecommerce_id", "=", ecommerce_id),
+                ("provider_code", "=", "athmovil"),
+            ],
+            limit=1,
+        )
+        if not tx:
+            return request.not_found()
+
+        # ATH Móvil payment URL that the customer's phone will open
+        payment_url = "https://payments.athmovil.com/pay/%s" % ecommerce_id
+
+        try:
+            import qrcode
+            import io
+
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(payment_url)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return request.make_response(
+                buf.getvalue(),
+                headers=[
+                    ("Content-Type", "image/png"),
+                    ("Cache-Control", "public, max-age=600"),
+                ],
+            )
+        except ImportError:
+            # Fallback: return a simple SVG QR placeholder
+            svg = (
+                '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">'
+                '<rect width="200" height="200" fill="white"/>'
+                '<text x="100" y="90" text-anchor="middle" font-size="12">'
+                'QR Code</text>'
+                '<text x="100" y="110" text-anchor="middle" font-size="10">'
+                'Install: pip install qrcode</text></svg>'
+            )
+            return request.make_response(
+                svg, headers=[("Content-Type", "image/svg+xml")]
+            )

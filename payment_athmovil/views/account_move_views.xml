@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Smart button + payment link button on invoice form -->
+    <record id="view_move_form_athmovil_button" model="ir.ui.view">
+        <field name="name">account.move.form.athmovil.button</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <!-- ATH Móvil transaction count smart button -->
+                <button name="action_view_athmovil_transactions"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-mobile"
+                        invisible="move_type not in ('out_invoice', 'out_refund')"
+                        groups="account.group_account_user">
+                    <field name="athmovil_tx_count" widget="statinfo" string="ATH Móvil"/>
+                </button>
+            </xpath>
+
+            <!-- Payment link generator button in header -->
+            <xpath expr="//header" position="inside">
+                <button name="action_athmovil_create_payment_link"
+                        type="object"
+                        string="🔗 ATH Móvil Link"
+                        class="btn-secondary"
+                        invisible="state != 'posted' or payment_state == 'paid' or move_type != 'out_invoice'"
+                        groups="account.group_account_user"/>
+            </xpath>
+
+            <!-- Show payment link if generated -->
+            <xpath expr="//field[@name='payment_reference']" position="after">
+                <field name="athmovil_payment_link"
+                       invisible="not athmovil_payment_link"
+                       readonly="1"
+                       widget="url"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

@@ -11,8 +11,6 @@
  * - Polling fallback if webhook hasn't fired
  */
 
-import { _t } from "@web/core/l10n/translation";
-
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_MS = 600000;
 

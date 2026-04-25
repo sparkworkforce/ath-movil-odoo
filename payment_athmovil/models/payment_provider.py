@@ -311,11 +311,15 @@ class PaymentProvider(models.Model):
                 # _athmovil_get_api_url() prepends ATH_API_BASE_URL, so we pass
                 # the path segment including the query string here.
                 result = provider._athmovil_make_request(
-                    "findPayment",
-                    payload={"ecommerceId": tx.athmovil_ecommerce_id},
-                    method="GET",
+                    "business/findPayment",
+                    payload={
+                        "publicToken": provider.athmovil_public_token,
+                        "ecommerceId": tx.athmovil_ecommerce_id,
+                    },
+                    method="POST",
                 )
-                ath_status = result.get("status", "")
+                data = result.get("data", result)
+                ath_status = data.get("ecommerceStatus", "")
 
                 if ath_status == "COMPLETED":
                     # Payment was approved in the ATH Móvil app but the webhook
@@ -364,3 +368,89 @@ class PaymentProvider(models.Model):
             done_count,
             cancelled_count,
         )
+
+    # -------------------------------------------------------------------------
+    # Scheduled action: Reconciliation with ATH Business reports
+    # -------------------------------------------------------------------------
+
+    def _athmovil_reconcile_transactions(self):
+        """Compare Odoo transactions with ATH Móvil's transaction report.
+
+        Calls GET /transactionReport for the last 24 hours and flags
+        discrepancies: payments in ATH but not in Odoo, or amount mismatches.
+        """
+        from datetime import datetime, timedelta
+
+        providers = self.env["payment.provider"].search(
+            [("code", "=", "athmovil"), ("state", "in", ("enabled", "test"))]
+        )
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
+        today = datetime.now().strftime("%Y-%m-%d 23:59:59")
+
+        for provider in providers:
+            try:
+                result = provider._athmovil_make_request(
+                    "transactionReport",
+                    payload={
+                        "publicToken": provider.athmovil_public_token,
+                        "fromDate": yesterday,
+                        "toDate": today,
+                    },
+                    method="POST",
+                )
+            except Exception as exc:
+                _logger.warning(
+                    "ATH Móvil reconciliation: could not fetch report for %s: %s",
+                    provider.name,
+                    exc,
+                )
+                continue
+
+            ath_transactions = result if isinstance(result, list) else []
+            for ath_tx in ath_transactions:
+                ref_number = ath_tx.get("referenceNumber", "")
+                ath_total = float(ath_tx.get("total", 0))
+                ath_status = ath_tx.get("status", "")
+                metadata1 = ath_tx.get("metadata1", "")
+
+                if ath_status != "COMPLETED":
+                    continue
+
+                odoo_tx = self.env["payment.transaction"].search(
+                    [
+                        ("reference", "=", metadata1),
+                        ("provider_code", "=", "athmovil"),
+                        ("provider_id", "=", provider.id),
+                    ],
+                    limit=1,
+                )
+
+                if not odoo_tx:
+                    _logger.warning(
+                        "ATH Móvil reconciliation: COMPLETED payment in ATH "
+                        "(ref: %s, $%.2f) has no matching Odoo transaction.",
+                        ref_number,
+                        ath_total,
+                    )
+                    continue
+
+                if odoo_tx.state != "done":
+                    odoo_tx.message_post(
+                        body=_(
+                            "⚠️ ATH Móvil reconciliation: payment is COMPLETED "
+                            "in ATH Business (ref: %s, $%.2f) but Odoo state "
+                            "is '%s'. Please investigate."
+                        )
+                        % (ref_number, ath_total, odoo_tx.state)
+                    )
+
+                if abs(ath_total - odoo_tx.amount) > 0.01:
+                    odoo_tx.message_post(
+                        body=_(
+                            "⚠️ ATH Móvil reconciliation: amount mismatch. "
+                            "ATH reports $%.2f but Odoo has $%.2f."
+                        )
+                        % (ath_total, odoo_tx.amount)
+                    )
+
+        _logger.info("ATH Móvil reconciliation completed for %d providers.", len(providers))

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="payment_status_page" name="ATH Móvil Payment Status">
+        <t t-call="website.layout">
+            <style>
+                @keyframes athmBounceIn {
+                    0% { transform: scale(0); opacity: 0; }
+                    50% { transform: scale(1.2); }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes athmPulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+                @keyframes athmFadeUp {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .athm-icon { animation: athmBounceIn 0.6s ease-out; }
+                .athm-pulse { animation: athmPulse 2s ease-in-out infinite; }
+                .athm-fade { animation: athmFadeUp 0.5s ease-out 0.3s both; }
+                .athm-fade-2 { animation: athmFadeUp 0.5s ease-out 0.5s both; }
+            </style>
+
+            <div class="container py-5">
+                <div class="row justify-content-center">
+                    <div class="col-md-6 text-center">
+
+                        <t t-if="status == 'done'">
+                            <div class="athm-icon text-success mb-3" style="font-size:4rem;">&#x2705;</div>
+                            <h2 class="athm-fade">Payment Successful</h2>
+                            <p class="text-muted athm-fade">Your ATH Móvil payment has been confirmed.</p>
+                            <div class="card mt-3 mb-4 athm-fade-2">
+                                <div class="card-body text-start">
+                                    <p class="mb-1"><strong>Amount:</strong> $<t t-out="'%.2f' % tx.amount"/></p>
+                                    <p class="mb-1"><strong>Reference:</strong> <t t-out="tx.reference"/></p>
+                                    <p class="mb-0" t-if="tx.athmovil_ecommerce_id">
+                                        <strong>ATH ID:</strong>
+                                        <code t-out="tx.athmovil_ecommerce_id"/>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="athm-fade-2">
+                                <a href="/my" class="btn btn-primary">Go to My Account</a>
+                                <button class="btn btn-outline-secondary ms-2"
+                                        onclick="window.print()">&#x1F5A8; Save Receipt</button>
+                            </div>
+                        </t>
+
+                        <t t-if="status == 'cancel'">
+                            <div class="athm-icon text-warning mb-3" style="font-size:4rem;">&#x274C;</div>
+                            <h2 class="athm-fade">Payment Cancelled</h2>
+                            <p class="text-muted athm-fade">No charge was made to your account.</p>
+                            <div class="athm-fade-2">
+                                <a href="/shop/payment" class="btn btn-primary">Try Again</a>
+                                <a href="/shop" class="btn btn-outline-secondary ms-2">Continue Shopping</a>
+                            </div>
+                        </t>
+
+                        <t t-if="status == 'expired'">
+                            <div class="athm-icon text-secondary mb-3" style="font-size:4rem;">&#x23F0;</div>
+                            <h2 class="athm-fade">Payment Expired</h2>
+                            <p class="text-muted athm-fade">The 10-minute window has passed. Please try again.</p>
+                            <div class="athm-fade-2">
+                                <a href="/shop/payment" class="btn btn-primary">Request New Payment</a>
+                            </div>
+                        </t>
+
+                        <t t-if="status == 'pending'">
+                            <div class="athm-icon athm-pulse text-info mb-3" style="font-size:4rem;">&#x23F3;</div>
+                            <h2 class="athm-fade">Payment Pending</h2>
+                            <p class="text-muted athm-fade">
+                                Open the <strong>ATH Móvil app</strong> on your phone to approve this payment.
+                            </p>
+                        </t>
+
+                        <hr class="my-4 athm-fade-2"/>
+                        <p class="small text-muted athm-fade-2">
+                            Powered by ATH Móvil Business · Support: 787-773-5466
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

@@ -32,7 +32,7 @@ class TestAthMovilProvider(TransactionCase):
             "reference": "TEST-LIMIT-001",
         })
         with self.assertRaises(ValidationError):
-            tx._get_specific_processing_values()
+            tx._get_specific_rendering_values({})
 
     def test_max_amount_boundary_passes(self):
         """No ValidationError for the limit amount check when amount == $1,500.00."""
@@ -51,7 +51,7 @@ class TestAthMovilProvider(TransactionCase):
             return_value={"ecommerceId": "mock-id", "status": "IN_PROCESS"},
         ):
             try:
-                tx._get_specific_processing_values()
+                tx._get_specific_rendering_values({})
             except Exception as e:
                 # If an exception is raised, it must NOT be the $1,500 limit error
                 self.assertNotIn("1,500", str(e),

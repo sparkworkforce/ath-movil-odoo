@@ -83,7 +83,7 @@ class TestAthMovilPBT(TransactionCase):
                 "reference": ref,
             })
             with self.assertRaises(ValidationError):
-                tx._get_specific_processing_values()
+                tx._get_specific_rendering_values({})
             tx.unlink()
 
         check()
@@ -116,7 +116,7 @@ class TestAthMovilPBT(TransactionCase):
             with patch.object(provider.__class__, "_athmovil_make_request",
                               return_value={"ecommerceId": "mock-id", "status": "IN_PROCESS"}):
                 try:
-                    tx._get_specific_processing_values()
+                    tx._get_specific_rendering_values({})
                 except ValidationError as e:
                     if "1,500" in str(e):
                         self.fail(f"Amount {amount} <= limit raised limit ValidationError")
