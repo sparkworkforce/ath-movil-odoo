@@ -322,8 +322,18 @@ class PaymentProvider(models.Model):
                 ath_status = data.get("ecommerceStatus", "")
 
                 if ath_status == "COMPLETED":
-                    # Payment was approved in the ATH Móvil app but the webhook
-                    # never reached our server. Mark as done to avoid revenue loss.
+                    # Verify amount before marking done
+                    ath_total = float(data.get("total", 0))
+                    if abs(ath_total - tx.amount) > 0.01:
+                        tx.message_post(
+                            body=_(
+                                "ATH Móvil cron: amount mismatch. "
+                                "ATH reports $%.2f but Odoo has $%.2f. "
+                                "Not marking as done."
+                            ) % (ath_total, tx.amount)
+                        )
+                        cancelled_count += 1
+                        continue
                     tx._set_done()
                     tx.message_post(
                         body=_(

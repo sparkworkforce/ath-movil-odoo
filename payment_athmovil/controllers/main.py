@@ -331,6 +331,11 @@ class AthMovilController(http.Controller):
                 ],
                 limit=1,
             )
+        # Session binding: authenticated users can only see their own transactions
+        if tx and request.env.user and not request.env.user._is_public():
+            if tx.partner_id.id != request.env.user.partner_id.id:
+                tx = None
+
         if tx:
             if tx.state == "done":
                 status = "done"

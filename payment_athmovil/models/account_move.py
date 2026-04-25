@@ -47,6 +47,8 @@ class AccountMove(models.Model):
         and stores the shareable payment link + QR URL on the invoice.
         """
         self.ensure_one()
+        self.check_access_rights("write")
+        self.check_access_rule("write")
         if self.state != "posted":
             raise UserError(_("Invoice must be posted to create a payment link."))
         if self.payment_state == "paid":

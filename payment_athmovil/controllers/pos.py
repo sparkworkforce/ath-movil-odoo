@@ -21,6 +21,9 @@ class AthMovilPosController(http.Controller):
 
         Returns the ecommerceId and QR URL for display on the customer screen.
         """
+        if not request.env.user.has_group("point_of_sale.group_pos_user"):
+            return {"error": "Access denied"}
+
         provider = request.env["payment.provider"].browse(provider_id)
         if not provider.exists() or provider.code != "athmovil":
             return {"error": "Invalid provider"}
@@ -39,7 +42,7 @@ class AthMovilPosController(http.Controller):
             result = provider._athmovil_make_request("payment", payload, "POST")
         except Exception as exc:
             _logger.error("ATH Móvil POS: ticket creation failed: %s", exc)
-            return {"error": str(exc)}
+            return {"error": "Payment ticket creation failed. Please try again."}
 
         ecommerce_id = result.get("ecommerceId", "")
         if not ecommerce_id:
@@ -59,6 +62,9 @@ class AthMovilPosController(http.Controller):
     )
     def pos_check_payment(self, provider_id, ecommerce_id):
         """Poll ATH Móvil for payment status (called from POS JS)."""
+        if not request.env.user.has_group("point_of_sale.group_pos_user"):
+            return {"status": "ERROR"}
+
         provider = request.env["payment.provider"].browse(provider_id)
         if not provider.exists() or provider.code != "athmovil":
             return {"status": "ERROR"}
